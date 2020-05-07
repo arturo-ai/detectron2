@@ -78,6 +78,11 @@ class ROIAlign(nn.Module):
             The difference does not make a difference to the model's performance if
             ROIAlign is used together with conv layers.
         """
+        print("\n#----------------- \n# Running ROIAlign \n#-----------------")
+        print("\toutput_size = ", output_size)
+        print("\tspatial_scale = ", spatial_scale, "(Scale the inp bbox by this number)")
+        print("\tsampling_ratio = ", sampling_ratio, "(number of inputs samples to take for each outputsample. 0 to take samples densely)")
+
         super(ROIAlign, self).__init__()
         self.output_size = output_size
         self.spatial_scale = spatial_scale
@@ -88,6 +93,10 @@ class ROIAlign(nn.Module):
         """
         Args:
             input: NCHW images
+                    For image size = 512
+                    At pyramid P3: [N, 256, 64, 64]
+                    At pyramid P4: [N, 256, 32, 32]
+                    At pyramid P5: [N, 256, 16, 16]
             rois: Bx5 boxes. First column is the index into N. The other 4 columns are xyxy.
         """
         assert rois.dim() == 2 and rois.size(1) == 5

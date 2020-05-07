@@ -161,6 +161,7 @@ class BitMasks:
             polygon_masks (list[list[ndarray]] or PolygonMasks)
             height, width (int)
         """
+        print("polygon_masks: \n", polygon_masks)
         if isinstance(polygon_masks, PolygonMasks):
             polygon_masks = polygon_masks.polygons
         masks = [polygons_to_bitmask(p, height, width) for p in polygon_masks]

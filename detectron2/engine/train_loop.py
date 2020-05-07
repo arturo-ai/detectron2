@@ -191,7 +191,7 @@ class SimpleTrainer(TrainerBase):
         like evaluation during training, you can overwrite its train() method.
         """
         model.train()
-
+        self.batch_num = 0
         self.model = model
         self.data_loader = data_loader
         self._data_loader_iter = iter(data_loader)
@@ -206,6 +206,7 @@ class SimpleTrainer(TrainerBase):
         """
         If you want to do something with the data, you can wrap the dataloader.
         """
+        print("[Batch] Running batch number === ", self.batch_num)
         data = next(self._data_loader_iter)
         data_time = time.perf_counter() - start
 
@@ -232,8 +233,10 @@ class SimpleTrainer(TrainerBase):
         wrap the optimizer with your custom `step()` method.
         """
         self.optimizer.step()
+        self.batch_num += 1
 
     def _detect_anomaly(self, losses, loss_dict):
+        print("loss_dict: ", loss_dict)
         if not torch.isfinite(losses).all():
             raise FloatingPointError(
                 "Loss became infinite or NaN at iteration={}!\nloss_dict = {}".format(

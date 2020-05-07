@@ -156,6 +156,7 @@ class BaseMaskRCNNHead(nn.Module):
         Args:
             vis_period (int): visualization period
         """
+        print("\n#----------------- \n# Running BaseMaskRCNNHead \n#-----------------")
         super().__init__()
         self.vis_period = vis_period
 
