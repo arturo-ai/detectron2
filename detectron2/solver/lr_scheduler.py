@@ -34,6 +34,15 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
         self.warmup_iters = warmup_iters
         self.warmup_method = warmup_method
         super().__init__(optimizer, last_epoch)
+        print("[Learning Rate Schedular]"
+              f"\t milestones = {milestones}"
+              f"\t gamma = {gamma}"
+              f"\t warmup_factor = {warmup_factor}"
+              f"\t warmup_iters = {warmup_iters}"
+              f"\t warmup_method = {warmup_method}"
+              f"\t last_epoch = {last_epoch}"
+              f"\t len(self.base_lrs) = {len(self.base_lrs)}"
+              )
 
     def get_lr(self) -> List[float]:
         warmup_factor = _get_warmup_factor_at_iter(
