@@ -206,7 +206,8 @@ class SimpleTrainer(TrainerBase):
         """
         If you want to do something with the data, you can wrap the dataloader.
         """
-        print("[Batch] Running batch number === ", self.batch_num)
+        if ((self.batch_num) % 1000) == 0:
+            print("[Batch] Running batch number === ", self.batch_num)
         data = next(self._data_loader_iter)
         data_time = time.perf_counter() - start
 
@@ -215,6 +216,9 @@ class SimpleTrainer(TrainerBase):
         """
         loss_dict = self.model(data)
         losses = sum(loss_dict.values())
+        if ((self.batch_num) % 1000) == 0:
+            print("[loss_dict] === \n", loss_dict)
+        
         self._detect_anomaly(losses, loss_dict)
 
         metrics_dict = loss_dict
@@ -236,7 +240,7 @@ class SimpleTrainer(TrainerBase):
         self.batch_num += 1
 
     def _detect_anomaly(self, losses, loss_dict):
-        print("loss_dict: ", loss_dict)
+#         print("loss_dict: ", loss_dict)
         if not torch.isfinite(losses).all():
             raise FloatingPointError(
                 "Loss became infinite or NaN at iteration={}!\nloss_dict = {}".format(
