@@ -104,6 +104,7 @@ class ROIAlign(nn.Module):
             input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.aligned
         )
 
+
     def __repr__(self):
         tmpstr = self.__class__.__name__ + "("
         tmpstr += "output_size=" + str(self.output_size)

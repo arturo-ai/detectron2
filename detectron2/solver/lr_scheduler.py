@@ -24,16 +24,36 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
         warmup_method: str = "linear",
         last_epoch: int = -1,
     ):
+        """
+        WarmupMultiStepLR(
+            optimizer,
+            cfg.SOLVER.STEPS,
+            cfg.SOLVER.GAMMA,
+            warmup_factor=cfg.SOLVER.WARMUP_FACTOR,
+            warmup_iters=cfg.SOLVER.WARMUP_ITERS,
+            warmup_method=cfg.SOLVER.WARMUP_METHOD,
+        )
+        """
         if not list(milestones) == sorted(milestones):
             raise ValueError(
                 "Milestones should be a list of" " increasing integers. Got {}", milestones
             )
+
         self.milestones = milestones
         self.gamma = gamma
         self.warmup_factor = warmup_factor
         self.warmup_iters = warmup_iters
         self.warmup_method = warmup_method
         super().__init__(optimizer, last_epoch)
+        print("[Learning Rate Schedular]"
+              f"\n\t milestones = {milestones}"
+              f"\n\t gamma = {gamma}"
+              f"\n\t warmup_factor = {warmup_factor}"
+              f"\n\t warmup_iters = {warmup_iters}"
+              f"\n\t warmup_method = {warmup_method}"
+              f"\n\t last_epoch = {last_epoch}"
+              f"\n\t len(self.base_lrs) = {len(self.base_lrs)}"
+              )
 
     def get_lr(self) -> List[float]:
         warmup_factor = _get_warmup_factor_at_iter(

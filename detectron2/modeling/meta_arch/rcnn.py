@@ -39,6 +39,8 @@ class GeneralizedRCNN(nn.Module):
         self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1))
         self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1))
 
+        self.activate_serving = cfg.ACTIVATE_SERVING
+
     @property
     def device(self):
         return self.pixel_mean.device
@@ -81,7 +83,7 @@ class GeneralizedRCNN(nn.Module):
             storage.put_image(vis_name, vis_img)
             break  # only visualize one image in a batch
 
-    def forward(self, batched_inputs):
+    def forward(self, batched_inputs,):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
@@ -104,7 +106,13 @@ class GeneralizedRCNN(nn.Module):
                 The :class:`Instances` object has the following keys:
                 "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
-        if not self.training:
+        # print("batched_inputs: ", batched_inputs)
+
+        if self.activate_serving:
+            print("[SERVING ACTIVATED] The model is now running with only image (B, 3, h, w)")
+            return self.serving_inference(batched_inputs)
+        elif not self.training:
+            # To set to inference do "model.eval()"
             return self.inference(batched_inputs)
 
         images = self.preprocess_image(batched_inputs)
@@ -157,6 +165,8 @@ class GeneralizedRCNN(nn.Module):
         """
         assert not self.training
 
+        print(batched_inputs)
+        print(" self.proposal_generator: ",  self.proposal_generator)
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
 
@@ -177,6 +187,53 @@ class GeneralizedRCNN(nn.Module):
         else:
             return results
 
+
+    def serving_inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
+        """
+        Run inference on the given inputs.
+
+        Args:
+            batched_inputs (list[dict]): same as in :meth:`forward`
+            detected_instances (None or list[Instances]): if not None, it
+                contains an `Instances` object per image. The `Instances`
+                object contains "pred_boxes" and "pred_classes" which are
+                known boxes in the image.
+                The inference will then skip the detection of bounding boxes,
+                and only predict other per-ROI outputs.
+            do_postprocess (bool): whether to apply post-processing on the outputs.
+
+        Returns:
+            same as in :meth:`forward`.
+        """
+        assert not self.training
+
+        print(batched_inputs)
+        images = batched_inputs.to(self.device)
+        images = (images - self.pixel_mean) / self.pixel_std
+        features = self.backbone(images)
+
+        if detected_instances is None:
+            if self.proposal_generator:
+                proposals, _ = self.proposal_generator(images, features, None)
+            else:
+                assert "proposals" in batched_inputs[0]
+                proposals = [x["proposals"].to(self.device) for x in batched_inputs]
+
+            results, _ = self.roi_heads(images, features, proposals, None)
+        else:
+            detected_instances = [x.to(self.device) for x in detected_instances]
+            results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+
+        if do_postprocess:
+            B, C, h, w = images.shape
+            if isinstance(h, int):
+                image_sizes = [[int(h), int(w)] for _ in range(0, B)]
+            else:
+                image_sizes = [[int(h.numpy()), int(w.numpy())] for _ in range(0, B)]
+            return GeneralizedRCNN.serving_postprocess(results, batched_inputs, image_sizes)
+        else:
+            return results
+
     def preprocess_image(self, batched_inputs):
         """
         Normalize, pad and batch the input images.
@@ -191,7 +248,7 @@ class GeneralizedRCNN(nn.Module):
         """
         Rescale the output instances to the target size.
         """
-        # note: private function; subject to changes
+        # note: private function; subject to c hanges
         processed_results = []
         for results_per_image, input_per_image, image_size in zip(
             instances, batched_inputs, image_sizes
@@ -200,6 +257,31 @@ class GeneralizedRCNN(nn.Module):
             width = input_per_image.get("width", image_size[1])
             r = detector_postprocess(results_per_image, height, width)
             processed_results.append({"instances": r})
+        return processed_results
+
+    @staticmethod
+    def serving_postprocess(instances, batched_inputs, image_sizes, postprocess=True):
+        """
+        Rescale the output instances to the target size.
+        """
+        # note: private function; subject to c hanges
+        processed_results = []
+        for results_per_image, input_per_image, image_size in zip(
+                instances, batched_inputs, image_sizes
+        ):
+            height = image_size[0]
+            width = image_size[1]
+            # r = results_per_image #detector_postprocess(results_per_image, height, width)
+            if postprocess:
+                results_per_image = detector_postprocess(results_per_image, height, width)
+            pred_classes = results_per_image.get("pred_classes")
+            pred_scores = results_per_image.get("scores")
+            pred_masks = results_per_image.get("pred_masks")
+            # mask_scores = results_per_image.get("mask_scores", None)
+            pred_boxes = results_per_image.get("pred_boxes").tensor
+            processed_results=[pred_classes, pred_scores, pred_boxes, pred_masks]   #
+            break
+
         return processed_results
 
 
