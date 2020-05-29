@@ -41,6 +41,17 @@ class GeneralizedRCNN(nn.Module):
 
         self.activate_serving = cfg.ACTIVATE_SERVING
 
+        if not self.training:
+            if self.activate_serving:
+                print("[modeling/meta_arch/rcnn.py] PHASE: {Evaluation with Serving} The model is now running with only image (B, 3, h, w)")
+            else:
+                print(
+                    "[modeling/meta_arch/rcnn.py] PHASE: {Normal Evaluation} The model is now running with only image (B, 3, h, w)")
+        else:
+            print(
+                "[modeling/meta_arch/rcnn.py] PHASE: Training The model is now running with only image (B, 3, h, w)")
+
+
     @property
     def device(self):
         return self.pixel_mean.device
@@ -108,12 +119,12 @@ class GeneralizedRCNN(nn.Module):
         """
         # print("batched_inputs: ", batched_inputs)
 
-        if self.activate_serving:
-            print("[SERVING ACTIVATED] The model is now running with only image (B, 3, h, w)")
-            return self.serving_inference(batched_inputs)
-        elif not self.training:
+        if not self.training:
             # To set to inference do "model.eval()"
-            return self.inference(batched_inputs)
+            if self.activate_serving:
+                return self.serving_inference(batched_inputs)
+            else:
+                return self.inference(batched_inputs)
 
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
@@ -164,9 +175,6 @@ class GeneralizedRCNN(nn.Module):
             same as in :meth:`forward`.
         """
         assert not self.training
-
-        print(batched_inputs)
-        print(" self.proposal_generator: ",  self.proposal_generator)
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
 
@@ -187,7 +195,6 @@ class GeneralizedRCNN(nn.Module):
         else:
             return results
 
-
     def serving_inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
         Run inference on the given inputs.
@@ -206,8 +213,6 @@ class GeneralizedRCNN(nn.Module):
             same as in :meth:`forward`.
         """
         assert not self.training
-
-        print(batched_inputs)
         images = batched_inputs.to(self.device)
         images = (images - self.pixel_mean) / self.pixel_std
         features = self.backbone(images)
@@ -277,9 +282,9 @@ class GeneralizedRCNN(nn.Module):
             pred_classes = results_per_image.get("pred_classes")
             pred_scores = results_per_image.get("scores")
             pred_masks = results_per_image.get("pred_masks")
-            # mask_scores = results_per_image.get("mask_scores", None)
+            mask_scores = results_per_image.get("mask_scores")
             pred_boxes = results_per_image.get("pred_boxes").tensor
-            processed_results=[pred_classes, pred_scores, pred_boxes, pred_masks]   #
+            processed_results=[pred_classes, pred_scores, pred_boxes, pred_masks, mask_scores]   #
             break
 
         return processed_results
