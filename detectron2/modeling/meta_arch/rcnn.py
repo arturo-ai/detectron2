@@ -30,27 +30,36 @@ class GeneralizedRCNN(nn.Module):
         super().__init__()
 
         self.backbone = build_backbone(cfg)
-        self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
+        self.proposal_generator = build_proposal_generator(
+            cfg, self.backbone.output_shape()
+        )
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         self.vis_period = cfg.VIS_PERIOD
         self.input_format = cfg.INPUT.FORMAT
 
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
-        self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1))
-        self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1))
+        self.register_buffer(
+            "pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1)
+        )
+        self.register_buffer(
+            "pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1)
+        )
 
         self.activate_serving = cfg.ACTIVATE_SERVING
 
         if not self.training:
             if self.activate_serving:
-                print("[modeling/meta_arch/rcnn.py] PHASE: {Evaluation with Serving} The model is now running with only image (B, 3, h, w)")
+                print(
+                    "[modeling/meta_arch/rcnn.py] PHASE: {Evaluation with Serving} The model is now running with only image (B, 3, h, w)"
+                )
             else:
                 print(
-                    "[modeling/meta_arch/rcnn.py] PHASE: {Normal Evaluation} The model is now running with only image (B, 3, h, w)")
+                    "[modeling/meta_arch/rcnn.py] PHASE: {Normal Evaluation} The model is now running with only image (B, 3, h, w)"
+                )
         else:
             print(
-                "[modeling/meta_arch/rcnn.py] PHASE: Training The model is now running with only image (B, 3, h, w)")
-
+                "[modeling/meta_arch/rcnn.py] PHASE: Training The model is now running with only image (B, 3, h, w)"
+            )
 
     @property
     def device(self):
@@ -94,7 +103,9 @@ class GeneralizedRCNN(nn.Module):
             storage.put_image(vis_name, vis_img)
             break  # only visualize one image in a batch
 
-    def forward(self, batched_inputs,):
+    def forward(
+        self, batched_inputs,
+    ):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
@@ -131,7 +142,9 @@ class GeneralizedRCNN(nn.Module):
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         elif "targets" in batched_inputs[0]:
             log_first_n(
-                logging.WARN, "'targets' in the model inputs is now renamed to 'instances'!", n=10
+                logging.WARN,
+                "'targets' in the model inputs is now renamed to 'instances'!",
+                n=10,
             )
             gt_instances = [x["targets"].to(self.device) for x in batched_inputs]
         else:
@@ -140,7 +153,9 @@ class GeneralizedRCNN(nn.Module):
         features = self.backbone(images.tensor)
 
         if self.proposal_generator:
-            proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
+            proposals, proposal_losses = self.proposal_generator(
+                images, features, gt_instances
+            )
         else:
             assert "proposals" in batched_inputs[0]
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
@@ -188,14 +203,20 @@ class GeneralizedRCNN(nn.Module):
             results, _ = self.roi_heads(images, features, proposals, None)
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
-            results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+            results = self.roi_heads.forward_with_given_boxes(
+                features, detected_instances
+            )
 
         if do_postprocess:
-            return GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+            return GeneralizedRCNN._postprocess(
+                results, batched_inputs, images.image_sizes
+            )
         else:
             return results
 
-    def serving_inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
+    def serving_inference(
+        self, batched_inputs, detected_instances=None, do_postprocess=True
+    ):
         """
         Run inference on the given inputs.
 
@@ -227,7 +248,9 @@ class GeneralizedRCNN(nn.Module):
             results, _ = self.roi_heads(images, features, proposals, None)
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
-            results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+            results = self.roi_heads.forward_with_given_boxes(
+                features, detected_instances
+            )
 
         if do_postprocess:
             B, C, h, w = images.shape
@@ -235,7 +258,9 @@ class GeneralizedRCNN(nn.Module):
                 image_sizes = [[int(h), int(w)] for _ in range(0, B)]
             else:
                 image_sizes = [[int(h.numpy()), int(w.numpy())] for _ in range(0, B)]
-            return GeneralizedRCNN.serving_postprocess(results, batched_inputs, image_sizes)
+            return GeneralizedRCNN.serving_postprocess(
+                results, batched_inputs, image_sizes
+            )
         else:
             return results
 
@@ -270,22 +295,66 @@ class GeneralizedRCNN(nn.Module):
         Rescale the output instances to the target size.
         """
         # note: private function; subject to c hanges
-        processed_results = []
-        for results_per_image, input_per_image, image_size in zip(
-                instances, batched_inputs, image_sizes
+        pred_classes_stacked = []
+        pred_scores_stacked = []
+        pred_masks_stacked = []
+        mask_scores_stacked = []
+        pred_boxes_stacked = []
+        for num_run, (results_per_image, input_per_image, image_size) in enumerate(
+            zip(instances, batched_inputs, image_sizes)
         ):
             height = image_size[0]
             width = image_size[1]
             # r = results_per_image #detector_postprocess(results_per_image, height, width)
             if postprocess:
-                results_per_image = detector_postprocess(results_per_image, height, width)
+                results_per_image = detector_postprocess(
+                    results_per_image, height, width
+                )
             pred_classes = results_per_image.get("pred_classes")
             pred_scores = results_per_image.get("scores")
             pred_masks = results_per_image.get("pred_masks")
             mask_scores = results_per_image.get("mask_scores")
             pred_boxes = results_per_image.get("pred_boxes").tensor
-            processed_results=[pred_classes, pred_scores, pred_boxes, pred_masks, mask_scores]   #
-            break
+
+            pred_classes_stacked.append(pred_classes)
+            pred_scores_stacked.append(pred_scores)
+            pred_masks_stacked.append(pred_masks)
+            mask_scores_stacked.append(mask_scores)
+            pred_boxes_stacked.append(pred_boxes)
+
+            # if num_run == 0:
+            #     pred_classes_stacked = pred_classes.unsqueeze(0)
+            #     pred_scores_stacked = pred_scores.unsqueeze(0)
+            #     pred_masks_stacked = pred_masks.unsqueeze(0)
+            #     mask_scores_stacked = mask_scores.unsqueeze(0)
+            #     pred_boxes_stacked = pred_boxes.unsqueeze(0)
+            # else:
+            #     pred_classes_stacked = torch.cat(
+            #         [pred_classes_stacked, pred_classes.unsqueeze(0)], dim=0
+            #     )
+            #     pred_scores_stacked = torch.cat(
+            #         [pred_scores_stacked, pred_scores.unsqueeze(0)], dim=0
+            #     )
+            #     pred_masks_stacked = torch.cat(
+            #         [pred_masks_stacked, pred_masks.unsqueeze(0)], dim=0
+            #     )
+            #     mask_scores_stacked = torch.cat(
+            #         [mask_scores_stacked, mask_scores.unsqueeze(0)], dim=0
+            #     )
+            #     pred_boxes_stacked = torch.cat(
+            #         [pred_boxes_stacked, pred_boxes.unsqueeze(0)], dim=0
+            #     )
+
+
+        #         print("pred_classes: ", pred_classes_stacked.shape, pred_scores_stacked.shape, pred_masks_stacked.shape, mask_scores_stacked.shape, pred_boxes_stacked.shape)
+
+        processed_results = [
+            pred_classes_stacked,
+            pred_scores_stacked,
+            pred_boxes_stacked,
+            pred_masks_stacked,
+            mask_scores_stacked,
+        ]
 
         return processed_results
 
@@ -295,10 +364,16 @@ class ProposalNetwork(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.backbone = build_backbone(cfg)
-        self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
+        self.proposal_generator = build_proposal_generator(
+            cfg, self.backbone.output_shape()
+        )
 
-        self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1))
-        self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1))
+        self.register_buffer(
+            "pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1)
+        )
+        self.register_buffer(
+            "pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1)
+        )
 
     @property
     def device(self):
@@ -324,12 +399,16 @@ class ProposalNetwork(nn.Module):
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         elif "targets" in batched_inputs[0]:
             log_first_n(
-                logging.WARN, "'targets' in the model inputs is now renamed to 'instances'!", n=10
+                logging.WARN,
+                "'targets' in the model inputs is now renamed to 'instances'!",
+                n=10,
             )
             gt_instances = [x["targets"].to(self.device) for x in batched_inputs]
         else:
             gt_instances = None
-        proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
+        proposals, proposal_losses = self.proposal_generator(
+            images, features, gt_instances
+        )
         # In training, the proposals are not useful at all but we generate them anyway.
         # This makes RPN-only models about 5% slower.
         if self.training:

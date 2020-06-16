@@ -18,7 +18,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
         self,
         optimizer: torch.optim.Optimizer,
         milestones: List[int],
-        gamma: float = 0.1,
+        gamma: float = 0.5,
         warmup_factor: float = 0.001,
         warmup_iters: int = 1000,
         warmup_method: str = "linear",
@@ -38,7 +38,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
             raise ValueError(
                 "Milestones should be a list of" " increasing integers. Got {}", milestones
             )
-
+        gamma = 0.5
         self.milestones = milestones
         self.gamma = gamma
         self.warmup_factor = warmup_factor

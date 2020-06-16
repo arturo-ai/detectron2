@@ -294,6 +294,7 @@ class DefaultTrainer(SimpleTrainer):
         )
         self.start_iter = 0
         self.max_iter = cfg.SOLVER.MAX_ITER
+        print("\n[DefaultTrainer/Checkpoint Loaded for iteration] Maximum Iteration at: ", self.start_iter)
         self.cfg = cfg
 
         self.register_hooks(self.build_hooks())
@@ -310,6 +311,7 @@ class DefaultTrainer(SimpleTrainer):
         """
         checkpoint = self.checkpointer.resume_or_load(self.cfg.MODEL.WEIGHTS, resume=resume)
         self.start_iter = checkpoint.get("iteration", -1) if resume else -1
+        print("\n[DefaultTrainer/Checkpoint Loaded for iteration] Start Iteration at: ", self.start_iter)
         # The checkpoint stores the training iteration that just finished, thus we start
         # at the next iteration (or iter zero if there's no checkpoint).
         self.start_iter += 1
