@@ -34,6 +34,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
             warmup_method=cfg.SOLVER.WARMUP_METHOD,
         )
         """
+        gamma = 0.5
         if not list(milestones) == sorted(milestones):
             raise ValueError(
                 "Milestones should be a list of" " increasing integers. Got {}", milestones

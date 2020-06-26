@@ -78,10 +78,10 @@ class ROIAlign(nn.Module):
             The difference does not make a difference to the model's performance if
             ROIAlign is used together with conv layers.
         """
-        print("\n#----------------- \n# Running ROIAlign \n#-----------------")
-        print("\toutput_size = ", output_size)
-        print("\tspatial_scale = ", spatial_scale, "(Scale the inp bbox by this number)")
-        print("\tsampling_ratio = ", sampling_ratio, "(number of inputs samples to take for each outputsample. 0 to take samples densely)")
+        # print("\n# Running ROIAlign \n#-----------------")
+        # print("\toutput_size = ", output_size)
+        # print("\tspatial_scale = ", spatial_scale, "(Scale the inp bbox by this number)")
+        # print("\tsampling_ratio = ", sampling_ratio, "(number of inputs samples to take for each outputsample. 0 to take samples densely)")
 
         super(ROIAlign, self).__init__()
         self.output_size = output_size

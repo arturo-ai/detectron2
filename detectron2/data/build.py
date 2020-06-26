@@ -274,6 +274,8 @@ def build_detection_train_loader(cfg, mapper=None):
     Returns:
         an infinite iterator of training data
     """
+    print("\n#----------------- \n# Running build_detection_train_loader\n#-----------------")
+
     num_workers = get_world_size()
     images_per_batch = cfg.SOLVER.IMS_PER_BATCH
     assert (
@@ -296,10 +298,14 @@ def build_detection_train_loader(cfg, mapper=None):
         else 0,
         proposal_files=cfg.DATASETS.PROPOSAL_FILES_TRAIN if cfg.MODEL.LOAD_PROPOSALS else None,
     )
+    print("Detection Dataset Dict Fetched ...................., TOTAL LENGTH = ", len(dataset_dicts))
+
     dataset = DatasetFromList(dataset_dicts, copy=False)
+    print("DatasetFromList: \n", dataset)
 
     if mapper is None:
         mapper = DatasetMapper(cfg, True)
+    print("mapper: \n", mapper)
     dataset = MapDataset(dataset, mapper)
 
     sampler_name = cfg.DATALOADER.SAMPLER_TRAIN
@@ -336,7 +342,6 @@ def build_detection_train_loader(cfg, mapper=None):
             collate_fn=trivial_batch_collator,
             worker_init_fn=worker_init_reset_seed,
         )
-
     return data_loader
 
 

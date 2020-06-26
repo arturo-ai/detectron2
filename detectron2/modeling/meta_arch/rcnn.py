@@ -45,22 +45,6 @@ class GeneralizedRCNN(nn.Module):
             "pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1)
         )
 
-        self.activate_serving = cfg.ACTIVATE_SERVING
-
-        if not self.training:
-            if self.activate_serving:
-                print(
-                    "[modeling/meta_arch/rcnn.py] PHASE: {Evaluation with Serving} The model is now running with only image (B, 3, h, w)"
-                )
-            else:
-                print(
-                    "[modeling/meta_arch/rcnn.py] PHASE: {Normal Evaluation} The model is now running with only image (B, 3, h, w)"
-                )
-        else:
-            print(
-                "[modeling/meta_arch/rcnn.py] PHASE: Training The model is now running with only image (B, 3, h, w)"
-            )
-
     @property
     def device(self):
         return self.pixel_mean.device
@@ -129,13 +113,8 @@ class GeneralizedRCNN(nn.Module):
                 "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
         # print("batched_inputs: ", batched_inputs)
-
         if not self.training:
-            # To set to inference do "model.eval()"
-            if self.activate_serving:
-                return self.serving_inference(batched_inputs)
-            else:
-                return self.inference(batched_inputs)
+            return self.inference(batched_inputs)
 
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
@@ -287,75 +266,6 @@ class GeneralizedRCNN(nn.Module):
             width = input_per_image.get("width", image_size[1])
             r = detector_postprocess(results_per_image, height, width)
             processed_results.append({"instances": r})
-        return processed_results
-
-    @staticmethod
-    def serving_postprocess(instances, batched_inputs, image_sizes, postprocess=True):
-        """
-        Rescale the output instances to the target size.
-        """
-        # note: private function; subject to c hanges
-        pred_classes_stacked = []
-        pred_scores_stacked = []
-        pred_masks_stacked = []
-        mask_scores_stacked = []
-        pred_boxes_stacked = []
-        for num_run, (results_per_image, input_per_image, image_size) in enumerate(
-            zip(instances, batched_inputs, image_sizes)
-        ):
-            height = image_size[0]
-            width = image_size[1]
-            # r = results_per_image #detector_postprocess(results_per_image, height, width)
-            if postprocess:
-                results_per_image = detector_postprocess(
-                    results_per_image, height, width
-                )
-            pred_classes = results_per_image.get("pred_classes")
-            pred_scores = results_per_image.get("scores")
-            pred_masks = results_per_image.get("pred_masks")
-            mask_scores = results_per_image.get("mask_scores")
-            pred_boxes = results_per_image.get("pred_boxes").tensor
-
-            pred_classes_stacked.append(pred_classes)
-            pred_scores_stacked.append(pred_scores)
-            pred_masks_stacked.append(pred_masks)
-            mask_scores_stacked.append(mask_scores)
-            pred_boxes_stacked.append(pred_boxes)
-
-            # if num_run == 0:
-            #     pred_classes_stacked = pred_classes.unsqueeze(0)
-            #     pred_scores_stacked = pred_scores.unsqueeze(0)
-            #     pred_masks_stacked = pred_masks.unsqueeze(0)
-            #     mask_scores_stacked = mask_scores.unsqueeze(0)
-            #     pred_boxes_stacked = pred_boxes.unsqueeze(0)
-            # else:
-            #     pred_classes_stacked = torch.cat(
-            #         [pred_classes_stacked, pred_classes.unsqueeze(0)], dim=0
-            #     )
-            #     pred_scores_stacked = torch.cat(
-            #         [pred_scores_stacked, pred_scores.unsqueeze(0)], dim=0
-            #     )
-            #     pred_masks_stacked = torch.cat(
-            #         [pred_masks_stacked, pred_masks.unsqueeze(0)], dim=0
-            #     )
-            #     mask_scores_stacked = torch.cat(
-            #         [mask_scores_stacked, mask_scores.unsqueeze(0)], dim=0
-            #     )
-            #     pred_boxes_stacked = torch.cat(
-            #         [pred_boxes_stacked, pred_boxes.unsqueeze(0)], dim=0
-            #     )
-
-
-        #         print("pred_classes: ", pred_classes_stacked.shape, pred_scores_stacked.shape, pred_masks_stacked.shape, mask_scores_stacked.shape, pred_boxes_stacked.shape)
-
-        processed_results = [
-            pred_classes_stacked,
-            pred_scores_stacked,
-            pred_boxes_stacked,
-            pred_masks_stacked,
-            mask_scores_stacked,
-        ]
-
         return processed_results
 
 
